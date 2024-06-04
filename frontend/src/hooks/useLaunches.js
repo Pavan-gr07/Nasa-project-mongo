@@ -1,0 +1,86 @@
+import { useCallback, useEffect, useState } from "react";
+
+import { httpGetLaunches, httpSubmitLaunch, httpAbortLaunch } from "./requests";
+
+function useLaunches(onSuccessSound, onAbortSound, onFailureSound) {
+  const [launches, saveLaunches] = useState([]);
+  const [isPendingLaunch, setPendingLaunch] = useState(false);
+
+  const getLaunches = useCallback(async () => {
+    try {
+      const fetchedLaunches = await httpGetLaunches();
+      saveLaunches(fetchedLaunches);
+    } catch (error) {
+      console.log(error);
+    }
+  }, []);
+
+  useEffect(() => {
+    getLaunches();
+  }, [getLaunches]);
+
+  const submitLaunch = useCallback(
+    async (e) => {
+      e.preventDefault();
+      // setPendingLaunch(true);
+
+      const data = new FormData(e.target);
+      console.log(data, "data");
+      const launchDate = new Date(data.get("launch-day"));
+      const mission = data.get("mission-name");
+      const rocket = data.get("rocket-name");
+      const target = data.get("planets-selector");
+      try {
+        const response = await httpSubmitLaunch({
+          launchDate,
+          mission,
+          rocket,
+          target,
+        });
+
+        const success = response.ok;
+        if (success) {
+          getLaunches();
+          setTimeout(() => {
+            setPendingLaunch(false);
+            onSuccessSound();
+          }, 800);
+        } else {
+          onFailureSound();
+        }
+      } catch (error) {
+        console.log(error);
+        onFailureSound();
+      }
+    },
+    [getLaunches, onSuccessSound, onFailureSound]
+  );
+
+  const abortLaunch = useCallback(
+    async (id) => {
+      try {
+        const response = await httpAbortLaunch(id);
+
+        const success = response?.ok;
+        if (success) {
+          getLaunches();
+          onAbortSound();
+        } else {
+          onFailureSound();
+        }
+      } catch (error) {
+        onFailureSound();
+      }
+    },
+    [getLaunches, onAbortSound, onFailureSound]
+  );
+
+  return {
+    launches,
+    isPendingLaunch,
+    submitLaunch,
+    abortLaunch,
+  };
+}
+
+export default useLaunches;
